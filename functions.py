@@ -271,7 +271,8 @@ def calculate_rent_for_group(
         total_area = session.query(func.sum(Room.area)).scalar()
         groups_active = session.query(Group).where(Group.active).all()
         total_head_count = sum(group.head_count for group in groups_active)
-        total_available_income = sum(group.available_income for group in groups_active)
+        all_incomes = [group.available_income for group in groups_active]
+        total_available_income = sum(all_incomes)
 
         # Retrieve the group
         group = session.query(Group).filter(Group.id == group_id).first()

@@ -234,39 +234,6 @@ def show_dashboard():
         st.plotly_chart(fig)
 
 
-def show_rent_calculation(user: Group):
-    st.header("Mietberechnung")
-
-    with Session() as session:
-        # Check if all active groups were updated in the last month
-        one_month_ago = datetime.now() - pd.Timedelta(days=30)
-        active_groups_updated = (
-            session.query(Group)
-            .filter(Group.active, Group.last_updated < one_month_ago)
-            .count()
-            == 0
-        )
-
-        if not active_groups_updated:
-            st.warning(
-                "Alle aktiven Gruppen müssen im letzten Monat aktualisiert worden sein, um die Mietberechnung anzuzeigen."
-            )
-            return
-
-        group = session.query(Group).filter(Group.name == user.name).first()
-        if group:
-            rent_calculation = calculate_rent_for_group(group.id)
-            st.write(
-                f"Miete berechnet nach Fläche: {rent_calculation['by_area']:.2f} EUR"
-            )
-            st.write(
-                f"Miete berechnet nach Kopfanzahl: {rent_calculation['by_head_count']:.2f} EUR"
-            )
-            st.write(
-                f"Miete berechnet nach verfügbarem Einkommen: {rent_calculation['by_available_income']:.2f} EUR"
-            )
-
-
 def show_user_profile(user: Group):
     st.header("Mein Profil")
     st.subheader("Persönliche Daten")
@@ -507,7 +474,7 @@ def evaluate_bids_and_start_round():
 
     with Session() as session:
         # Check for existing open bidding round
-        bidding_status = (
+        bidding_status: BiddingStatus = (
             session.query(BiddingStatus)
             .order_by(BiddingStatus.created_at.desc())
             .first()
@@ -515,96 +482,6 @@ def evaluate_bids_and_start_round():
 
         if bidding_status and bidding_status.status == "open":
             st.subheader("Aktuelle Bietrunde")
-            st.write("Warten auf alle Gebote...")
-
-            total_needed = bidding_status.total_amount_needed
-            total_pledged = bidding_status.total_amount_pledged
-
-            active_groups = session.query(Group).filter(Group.active == True).all()
-            active_groups_count = len(active_groups)
-            submitted_bids = BiddingStatus.bids
-            submitted_bids_count = len(submitted_bids)
-            groups_with_bids = {bid.group_id for bid in submitted_bids}
-            groups_missing_bids = [
-                group.name
-                for group in active_groups
-                if group.id not in groups_with_bids
-            ]
-
-            if submitted_bids_count >= active_groups_count:
-                if total_pledged >= total_needed:
-                    bidding_status.amount_shortfall = total_needed - total_pledged
-                    st.success(
-                        "Alle Gebote abgegeben. Gesamtbetrag erreicht! "
-                        f"Um {bidding_status.amount_shortfall:.2f} überboten."
-                    )
-                    button = st.button(
-                        "Miete so festlegen. Überschuss auf alle verteilen."
-                    )
-                else:
-                    bidding_status.amount_shortfall = total_needed - total_pledged
-                    st.warning(
-                        f"Es fehlen noch {bidding_status.amount_shortfall:.2f} EUR."
-                    )
-                    button = st.button(
-                        "Miete so festlegen. Fehlbetrag von Puffern abziehen."
-                    )
-                session.commit()
-                if button():
-                    bidding_status.status = "evaluated"
-                    session.commit()
-                    bids_to_rent(bidding_status, session)
-                    st.success("Miete erfolgreich festgelegt.")
-
-            else:
-                st.warning("Noch nicht alle Gebote abgegeben.")
-                st.write("Gruppen ohne Gebot:")
-                for group_name in groups_missing_bids:
-                    st.write(group_name)
-        else:
-            st.header("Bietrunde starten")
-            start_date = st.date_input(
-                "Startdatum", value=date.today(), key="monthly_start_date_all"
-            )
-            end_date = st.date_input(
-                "Enddatum", value=date.today(), key="monthly_end_date_all"
-            )
-
-            if st.button("Neue Bietrunde starten"):
-                total_yearly_expenses = session.query(
-                    func.sum(Expense.yearly_amount)
-                ).scalar()
-                total_yearly_target = session.query(
-                    func.sum(Fund.yearly_target)
-                ).scalar()
-
-                new_bidding_status = BiddingStatus(
-                    status="open",
-                    total_cash_needed=total_yearly_expenses / 12,
-                    total_giro_needed=total_yearly_target / 12,
-                    total_amount_pledged=0,
-                    period_start=start_date,
-                    period_end=end_date,
-                )
-                session.add(new_bidding_status)
-                session.commit()
-                st.success("Neue Bietrunde gestartet!")
-
-
-def evaluate_bids_and_start_round():
-    st.header("Gebote auswerten und Bietrunde starten")
-
-    with Session() as session:
-        # Check for existing open bidding round
-        bidding_status = (
-            session.query(BiddingStatus)
-            .order_by(BiddingStatus.created_at.desc())
-            .first()
-        )
-
-        if bidding_status and bidding_status.status == "open":
-            st.subheader("Aktuelle Bietrunde")
-            st.write("Warten auf alle Gebote...")
 
             total_needed = bidding_status.total_amount_needed
             total_pledged = bidding_status.total_amount_pledged
@@ -625,16 +502,26 @@ def evaluate_bids_and_start_round():
             ]
 
             if submitted_bids_count >= active_groups_count:
-                bidding_status.status = "evaluated"
                 if total_pledged >= total_needed:
-                    bidding_status.amount_shortfall = 0
-                    st.success("Alle Gebote abgegeben. Gesamtbetrag erreicht!")
+                    st.success(
+                        "Alle Gebote abgegeben. Gesamtbetrag erreicht! "
+                        f"Um {bidding_status.amount_shortfall:.2f} überboten."
+                    )
+                    button = st.button(
+                        "Miete so festlegen. Überschuss auf alle verteilen."
+                    )
                 else:
-                    bidding_status.amount_shortfall = total_needed - total_pledged
+
                     st.warning(
                         f"Es fehlen noch {bidding_status.amount_shortfall:.2f} EUR."
                     )
-                session.commit()
+                    button = st.button(
+                        "Miete so festlegen. Fehlbetrag von Puffern abziehen."
+                    )
+                if button:
+                    bidding_status.status = "evaluated"
+                    session.commit()
+                    bids_to_rent(bidding_status, session)
             else:
                 st.warning("Noch nicht alle Gebote abgegeben.")
                 st.write("Gruppen ohne Gebot:")
@@ -643,26 +530,73 @@ def evaluate_bids_and_start_round():
         else:
             st.subheader("Keine offene Bietrunde verfügbar oder bereits ausgewertet.")
 
-        st.header("Bietrunde starten")
-        if st.button("Neue Bietrunde starten"):
-            total_yearly_expenses = session.query(
-                func.sum(Expense.yearly_amount)
-            ).scalar()
-            total_yearly_target = session.query(func.sum(Fund.yearly_target)).scalar()
-            monthly_total_rent = (total_yearly_expenses + total_yearly_target) / 12
+            st.header("Bietrunde starten")
+            with st.form("start_bidding"):
 
-            new_bidding_status = BiddingStatus(
-                status="open",
-                total_amount_needed=monthly_total_rent,
-                total_amount_pledged=0,
-                amount_shortfall=monthly_total_rent,
-            )
-            session.add(new_bidding_status)
-            session.commit()
-            st.success("Neue Bietrunde gestartet!")
+                total_yearly_expenses = session.query(
+                    func.sum(Expense.yearly_amount)
+                ).scalar()
+                total_yearly_target = session.query(
+                    func.sum(Fund.yearly_target)
+                ).scalar()
+                month_start = pd.Timestamp.today().replace(day=1) + pd.DateOffset(
+                    months=1
+                )
+                period_start = st.date_input(
+                    "Beginn des Mietzeitraums", value=month_start
+                )
+                period_end = st.date_input(
+                    "Ende des Mietzeitraums", month_start + pd.DateOffset(months=6)
+                )
+                if st.form_submit_button("Bietrunde starten"):
+                    new_bidding_status = BiddingStatus(
+                        status="open",
+                        total_cash_needed=total_yearly_target / 12,
+                        total_giro_needed=total_yearly_expenses / 12,
+                        total_amount_pledged=0,
+                        period_start=period_start,
+                        period_end=period_end,
+                    )
+                    session.add(new_bidding_status)
+                    session.commit()
+                    st.success("Neue Bietrunde gestartet!")
 
 
 def submit_rent_bid(user: Group):
+    st.header("Mietberechnung")
+
+    with Session() as session:
+        # Check if all active groups were updated in the last month
+        one_month_ago = datetime.now() - pd.Timedelta(days=30)
+        active_groups_updated = (
+            session.query(Group)
+            .filter(Group.active, Group.last_updated < one_month_ago)
+            .count()
+            == 0
+        )
+        missing_income = (
+            session.query(Group).filter(Group.active, Group.income == None).count() != 0
+        )
+
+        if missing_income or not active_groups_updated:
+            st.warning(
+                "Alle aktiven Gruppen müssen im letzten Monat aktualisiert worden sein, um die Mietberechnung anzuzeigen."
+            )
+            return
+
+        group = session.query(Group).filter(Group.name == user.name).first()
+        if group:
+            rent_calculation = calculate_rent_for_group(group.id)
+            st.write(
+                f"Miete berechnet nach Fläche: {rent_calculation['by_area']:.2f} EUR"
+            )
+            st.write(
+                f"Miete berechnet nach Kopfanzahl: {rent_calculation['by_head_count']:.2f} EUR"
+            )
+            st.write(
+                f"Miete berechnet nach verfügbarem Einkommen: {rent_calculation['by_available_income']:.2f} EUR"
+            )
+
     st.header("Mietgebot abgeben")
 
     with Session() as session:
@@ -711,26 +645,17 @@ def submit_rent_bid(user: Group):
                     .filter(Group.active == True)
                     .scalar()
                 )
-                submitted_bids_count = len(Bid.bids)
+                submitted_bids_count = len(current_bidding_status.bids)
 
                 if submitted_bids_count >= active_groups_count:
-                    current_bidding_status.status = "evaluated"
-                    if total_pledged >= current_bidding_status.total_amount_needed:
-                        current_bidding_status.amount_shortfall = 0
-                        st.success("Alle Gebote abgegeben. Gesamtbetrag erreicht!")
-                    else:
-                        current_bidding_status.amount_shortfall = (
-                            current_bidding_status.total_amount_needed - total_pledged
-                        )
-                        st.warning(
-                            f"Es fehlen noch {current_bidding_status.amount_shortfall:.2f} EUR."
-                        )
+                    st.success(
+                        "Alle Gebote abgegeben. Sag doch der Verwaltungs-AG Bescheid."
+                    )
                 else:
                     st.success(
                         "Gebot erfolgreich abgegeben! Warten auf weitere Gebote."
                     )
-
-                session.commit()
+                st.rerun()
 
 
 def show_cash_management(user: Group):
@@ -1063,7 +988,13 @@ if authentication_status:
         "Ausgaben verwalten",
         "Bietrunde",
     ]
-    user_tabs = ["Dashboard", "Einzahlungen", "Ausgaben", "Mein Profil"]
+    user_tabs = [
+        "Dashboard",
+        "Einzahlungen",
+        "Ausgaben",
+        "Mein Profil",
+        "Mietgebot abgeben",
+    ]
 
     tabs = admin_tabs if role == "admin" else user_tabs
 
@@ -1089,6 +1020,8 @@ if authentication_status:
         show_expenses_management()
     elif selected_tab == "Bietrunde":
         evaluate_bids_and_start_round()
+    elif selected_tab == "Mietgebot abgeben":
+        submit_rent_bid(current_user)
     else:
         show_dashboard()
 else:

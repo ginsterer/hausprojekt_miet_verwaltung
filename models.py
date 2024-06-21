@@ -1,4 +1,5 @@
 import enum
+import logging
 from datetime import datetime
 from enum import StrEnum
 
@@ -35,6 +36,7 @@ class Group(Base):
     members = relationship("Person", back_populates="group")
     income = Column(Integer)
     bids = relationship("Bid", back_populates="group")
+    last_updated = Column(Date, default=datetime.utcnow)
 
     @property
     def head_count(self) -> float:
@@ -88,7 +90,6 @@ class Person(Base):
     category_id = Column(Integer, ForeignKey("people_categories.id"))
     group_id = Column(Integer, ForeignKey("groups.id"))
     group = relationship("Group", back_populates="members")
-    latest_update = Column(Date)
 
 
 class PeopleCategory(Base):
