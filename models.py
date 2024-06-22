@@ -97,7 +97,7 @@ class PeopleCategory(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True)
     monthly_base_need = Column(Integer)
-    head_count = Column(Float, nullable=False, default=0)
+    head_count = Column(Float, nullable=False, default=0.0)
 
 
 class Room(Base):

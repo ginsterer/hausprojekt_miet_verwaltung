@@ -314,7 +314,7 @@ def calculate_rent_for_group(
         }
 
 
-def bids_to_rent(bidding_status: BiddingStatus, session: Session):
+def bids_to_rent(bidding_status: BiddingStatus, session: Session) -> None:
     total_needed = bidding_status.total_amount_needed
     total_pledged = bidding_status.total_amount_pledged
 
@@ -329,6 +329,31 @@ def bids_to_rent(bidding_status: BiddingStatus, session: Session):
         cash_part = math.ceil(cash_needed * proportion / 5) * 5
         giro_part = (bidding_status.total_giro_needed * proportion) - cash_part
 
+        # Adjust existing MonthlyCash records
+        existing_cash_records = (
+            session.query(MonthlyCash)
+            .filter(
+                MonthlyCash.group_id == group.id,
+                MonthlyCash.end_date >= bidding_status.period_start,
+            )
+            .all()
+        )
+        for record in existing_cash_records:
+            record.end_date = bidding_status.period_start
+
+        # Adjust existing MonthlyGiro records
+        existing_giro_records = (
+            session.query(MonthlyGiro)
+            .filter(
+                MonthlyGiro.group_id == group.id,
+                MonthlyGiro.end_date >= bidding_status.period_start,
+            )
+            .all()
+        )
+        for record in existing_giro_records:
+            record.end_date = bidding_status.period_start
+
+        # add new records
         new_cash_transfer = MonthlyCash(
             group_id=group.id,
             amount=cash_part,
@@ -345,3 +370,39 @@ def bids_to_rent(bidding_status: BiddingStatus, session: Session):
         )
         session.add(new_giro_transfer)
     session.commit()
+
+
+def current_payments(group, session):
+    """
+    Retrieve the current monthly cash and giro payments for a specific group.
+
+    Parameters:
+    - group: Group object representing the group for which to retrieve the payments.
+    - session: SQLAlchemy session object for interacting with the database.
+
+    Returns:
+    Tuple containing the current monthly cash payment (float) and the current monthly giro payment amount (float).
+    """
+
+    current_cash_payment = (
+        session.query(MonthlyCash)
+        .filter(
+            MonthlyCash.group_id == group.id,
+            MonthlyCash.start_date < datetime.now(),
+            MonthlyCash.end_date > datetime.now(),
+        )
+        .first()
+    )
+    current_giro_payment = (
+        session.query(MonthlyGiro)
+        .filter(
+            MonthlyGiro.group_id == group.id,
+            MonthlyGiro.start_date < datetime.now(),
+            MonthlyGiro.end_date > datetime.now(),
+        )
+        .first()
+    )
+    cash = current_cash_payment.amount if current_cash_payment else 0
+    giro = current_giro_payment.amount if current_giro_payment else 0
+
+    return cash, giro
