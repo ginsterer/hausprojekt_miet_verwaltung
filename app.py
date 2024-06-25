@@ -729,7 +729,7 @@ def show_expenses_management():
                         session,
                         new_expense.id,
                         "add",
-                        explanation ,
+                        explanation,
                         None,
                         new_expense_amount,
                     )
