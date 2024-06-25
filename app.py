@@ -692,11 +692,10 @@ def show_group_management():
             )
 
         if st.button("Monatliche Beträge hinzufügen"):
-            with Session() as session:
-                for group_id, amount in monthly_amounts.items():
-                    if amount > 0:
-                        add_monthly_amount(group_id, amount, start_date, end_date)
-                st.success("Monatliche Beträge hinzugefügt!")
+            for group_id, amount in monthly_amounts.items():
+                if amount > 0:
+                    add_monthly_amount(group_id, amount, start_date, end_date)
+            st.success("Monatliche Beträge hinzugefügt!")
 
 
 def show_expenses_management():
@@ -766,13 +765,11 @@ def show_expenses_management():
                     delete_expense_button = st.form_submit_button("Ausgabe löschen")
 
                     if save_changes_button:
-                        old_details = f"Name: {expense.name}, Amount: {expense.yearly_amount}, Type: {expense.type}"
                         old_amount = expense.yearly_amount
                         expense.name = edit_name
                         expense.yearly_amount = edit_amount
                         expense.type = type_mapping[edit_type]
                         session.commit()
-                        new_details = f"Name: {expense.name}, Amount: {expense.yearly_amount}, Type: {expense.type}"
                         log_change(
                             session,
                             expense.id,
@@ -885,11 +882,10 @@ def show_cash_management(user: Group):
 
         b = st.form_submit_button("Fonds hinzufügen")
     if b:
-        with Session() as session:
-            add_fund(new_fund_name, new_fund_yearly_target)
-            st.success(
-                f"Fonds {new_fund_name} mit einem jährlichen Ziel von {new_fund_yearly_target} EUR hinzugefügt!"
-            )
+        add_fund(new_fund_name, new_fund_yearly_target)
+        st.success(
+            f"Fonds {new_fund_name} mit einem jährlichen Ziel von {new_fund_yearly_target} EUR hinzugefügt!"
+        )
 
 
 def show_deposits(role: Literal["admin", "user"], name: str):
@@ -1055,10 +1051,10 @@ def show_confirmation():
 
                     with cols[5]:
                         if st.button("Löschen", key=f"delete_{transaction.id}"):
-                            with Session() as session:
-                                for trans in transactions:
-                                    session.delete(trans)
-                                session.commit()
+
+                            for trans in transactions:
+                                session.delete(trans)
+                            session.commit()
                             st.success(
                                 f"Transaktion {transaction.id} gelöscht!"
                                 if not transaction.transfer_id
