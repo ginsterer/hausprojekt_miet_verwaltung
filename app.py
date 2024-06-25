@@ -1121,8 +1121,7 @@ if authentication_status:
         "Bargeldverwaltung",
         "Kosten verwalten",
         "Bietrunde",
-        "Personenverwaltung",
-        "Räume und Kategorien verwalten",
+        "Räume und Bewohner*innen",
         "Mein Profil",
     ]
     user_tabs = [
