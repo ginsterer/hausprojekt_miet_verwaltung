@@ -1,7 +1,4 @@
-import enum
-import logging
 from datetime import datetime
-from enum import StrEnum
 
 from sqlalchemy import (
     Column,
@@ -140,8 +137,21 @@ class Fund(Base):
     name = Column(String, index=True)
     current_balance = Column(Float, default=0)
     yearly_target = Column(Float)
-    history = Column(String, default="{}")  # JSON-encoded string
     transactions = relationship("Transaction", back_populates="fund")
+    change_logs = relationship("FundChangeLog", back_populates="fund")
+
+
+class FundChangeLog(Base):
+    __tablename__ = "fund_change_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    fund_id = Column(Integer, ForeignKey("funds.id"))
+    change_type = Column(String, nullable=False)  # e.g., 'add', 'edit', 'delete'
+    details = Column(String)
+    previous_amount = Column(Float)
+    new_amount = Column(Float)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    fund = relationship("Fund", back_populates="change_logs")
 
 
 class Expense(Base):

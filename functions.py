@@ -1,12 +1,12 @@
-import hashlib
-import math
-from typing import Optional, Literal, List, Dict, Tuple
-from datetime import datetime, timedelta, date
 import json
-from sqlalchemy.orm import sessionmaker
+import math
+from datetime import datetime, timedelta, date
+from typing import Optional, Literal, List, Dict, Tuple
+
 from sqlalchemy import func
-from functools import lru_cache
+from sqlalchemy.orm import sessionmaker
 from streamlit_authenticator.utilities import hasher
+
 from models import (
     Group,
     Fund,
@@ -18,8 +18,8 @@ from models import (
     MonthlyGiro,
     engine,
     ExpenseChangeLog,
+    FundChangeLog,
 )
-
 
 Session = sessionmaker(bind=engine)
 
@@ -410,13 +410,24 @@ def current_payments(group, session):
     return cash, giro
 
 
-def log_change(session, expense_id, change_type, details, previous_amount, new_amount):
-    change_log = ExpenseChangeLog(
-        expense_id=expense_id,
-        change_type=change_type,
-        details=details,
-        previous_amount=previous_amount,
-        new_amount=new_amount,
-    )
+def log_change(
+    session, entity_id, change_type, details, previous_amount, new_amount, entity_type
+):
+    if entity_type == "expense":
+        change_log = ExpenseChangeLog(
+            expense_id=entity_id,
+            change_type=change_type,
+            details=details,
+            previous_amount=previous_amount,
+            new_amount=new_amount,
+        )
+    elif entity_type == "fund":
+        change_log = FundChangeLog(
+            fund_id=entity_id,
+            change_type=change_type,
+            details=details,
+            previous_amount=previous_amount,
+            new_amount=new_amount,
+        )
     session.add(change_log)
     session.commit()

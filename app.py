@@ -731,6 +731,7 @@ def show_expenses_management():
                         explanation,
                         None,
                         new_expense_amount,
+                        "expence",
                     )
                     st.success(f"Ausgabe {new_expense_name} hinzugefügt!")
 
@@ -739,7 +740,7 @@ def show_expenses_management():
     with Session() as session:
         expenses = session.query(Expense).all()
         for expense in expenses:
-            with st.expander(f"{expense.name} (ID: {expense.id}, Typ: {expense.type})"):
+            with st.expander(f"{expense.name}"):
                 with st.form(f"edit_expense_{expense.id}"):
                     edit_name = st.text_input(
                         "Name", value=expense.name, key=f"edit_name_{expense.id}"
@@ -777,6 +778,7 @@ def show_expenses_management():
                             explanation,
                             old_amount,
                             edit_amount,
+                            "expence",
                         )
                         st.success(f"Änderungen für {expense.name} gespeichert!")
 
@@ -791,101 +793,151 @@ def show_expenses_management():
                             explanation,
                             expense.yearly_amount,
                             None,
+                            "expence",
                         )
                         session.delete(expense)
                         session.commit()
                         st.success(f"Ausgabe {expense.name} gelöscht!")
 
 
-def show_cash_management(user: Group):
+def show_funds_management(user: Group):
     st.header("Bargeldverwaltung")
-    st.subheader("Fonds übertragen")
-    with st.form("übertagung durchführen"):
-        from_fund_name = st.selectbox(
-            "Von Fonds",
-            [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-            key="transfer_from_fund",
-        )
-        to_fund_name = st.selectbox(
-            "Zu Fonds",
-            [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-            key="transfer_to_fund",
-        )
-        transfer_amount = st.number_input(
-            "Betrag", min_value=0.0, key="transfer_amount"
-        )
-
-        button = st.form_submit_button("Übertragung durchführen")
-    if button:
-        with Session() as session:
-            from_fund = session.query(Fund).filter(Fund.name == from_fund_name).first()
-            to_fund = session.query(Fund).filter(Fund.name == to_fund_name).first()
-            transfer_funds(from_fund.id, to_fund.id, transfer_amount, user.id)
-            st.success(
-                f"{transfer_amount} EUR von {from_fund_name} zu {to_fund_name} übertragen!"
-            )
-
-    st.subheader("Fonds bearbeiten oder löschen")
-
-    delete_fund_name = st.selectbox(
-        "Fonds",
-        [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-        key="delete_fund_name",
-    )
-    with Session() as session:
-        delete_fund_obj = (
-            session.query(Fund).filter(Fund.name == delete_fund_name).first()
-        )
-
-        with st.form("Fonds löschen"):
-
-            new_fund_name = st.text_input(
-                "Fondsname", key="update_fund_name", value=delete_fund_name
-            )
-            new_fund_yearly_target = st.number_input(
-                "Jährliches Ziel",
-                min_value=0.0,
-                key="update_fund_yearly_target",
-                value=delete_fund_obj.yearly_target,
-            )
-            update_fund_submit = st.form_submit_button("Fonds aktualisieren")
-            transfer_to_fund_name = st.selectbox(
-                "Übertragen verbleibender Saldo zu",
+    with st.expander("Einzahlungstopf leeren"):
+        show_distribution(user)
+    with st.expander("Einzahlungen prüfen"):
+        show_deposits(user.role, user.name)
+    with st.expander("Ausgaben"):
+        show_expenses(role, current_user)
+    with st.expander("Kassentransaktionen bestätigen"):
+        show_confirmation()
+    with st.expander("Geld zwischen Fonds verschieben"):
+        with st.form("Übertragung durchführen"):
+            from_fund_name = st.selectbox(
+                "Von Fonds",
                 [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-                key="delete_transfer_to_fund_name",
+                key="transfer_from_fund",
+            )
+            to_fund_name = st.selectbox(
+                "Zu Fonds",
+                [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
+                key="transfer_to_fund",
+            )
+            transfer_amount = st.number_input(
+                "Betrag", min_value=0.0, key="transfer_amount"
             )
 
-            delete_button = st.form_submit_button("Fonds löschen")
-            if update_fund_submit:
-                delete_fund_obj.name = new_fund_name
-                delete_fund_obj.yearly_target = new_fund_yearly_target
-                session.commit()
-                st.success("Fonds aktualisiert!")
-
-            if delete_button:
-                transfer_to_fund = (
-                    session.query(Fund)
-                    .filter(Fund.name == transfer_to_fund_name)
-                    .first()
+            button = st.form_submit_button("Übertragung durchführen")
+        if button:
+            with Session() as session:
+                from_fund = (
+                    session.query(Fund).filter(Fund.name == from_fund_name).first()
                 )
-                delete_fund(delete_fund_obj.id, transfer_to_fund.id, user.id)
+                to_fund = session.query(Fund).filter(Fund.name == to_fund_name).first()
+                transfer_funds(from_fund.id, to_fund.id, transfer_amount, user.id)
                 st.success(
-                    f"Fonds {delete_fund_name} gelöscht und verbleibender Saldo zu {transfer_to_fund_name} übertragen!"
+                    f"{transfer_amount} EUR von {from_fund_name} zu {to_fund_name} übertragen!"
                 )
 
-    st.subheader("Neuen Fonds hinzufügen")
-    with st.form("Neuen Fonds hinzufügen"):
-        new_fund_name = st.text_input("Fondsname", key="new_fund_name")
-        new_fund_yearly_target = st.number_input(
-            "Jährliches Ziel", min_value=0.0, key="new_fund_yearly_target"
-        )
+    with st.expander("Fonds bearbeiten oder löschen"):
 
-        b = st.form_submit_button("Fonds hinzufügen")
-    if b:
-        add_fund(new_fund_name, new_fund_yearly_target)
-        st.success(
-            f"Fonds {new_fund_name} mit einem jährlichen Ziel von {new_fund_yearly_target} EUR hinzugefügt!"
+        delete_fund_name = st.selectbox(
+            "Fonds",
+            [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
+            key="delete_fund_name",
         )
+        with Session() as session:
+            delete_fund_obj = (
+                session.query(Fund).filter(Fund.name == delete_fund_name).first()
+            )
+
+            with st.form("Fonds löschen"):
+
+                new_fund_name = st.text_input(
+                    "Fondsname", key="update_fund_name", value=delete_fund_name
+                )
+                new_fund_yearly_target = st.number_input(
+                    "Jährliches Ziel",
+                    min_value=0.0,
+                    key="update_fund_yearly_target",
+                    value=delete_fund_obj.yearly_target,
+                )
+                explanation = st.text_input("Erklärung", key="update_fund_explanation")
+                update_fund_submit = st.form_submit_button("Fonds aktualisieren")
+                transfer_to_fund_name = st.selectbox(
+                    "Übertragen verbleibender Saldo zu",
+                    [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
+                    key="delete_transfer_to_fund_name",
+                )
+
+                delete_button = st.form_submit_button("Fonds löschen")
+                if update_fund_submit:
+                    old_yearly_target = delete_fund_obj.yearly_target
+                    delete_fund_obj.name = new_fund_name
+                    delete_fund_obj.yearly_target = new_fund_yearly_target
+                    session.commit()
+                    log_change(
+                        session,
+                        delete_fund_obj.id,
+                        "edit",
+                        explanation,
+                        old_yearly_target,
+                        new_fund_yearly_target,
+                        "fund",
+                    )
+                    st.success("Fonds aktualisiert!")
+
+                if delete_button:
+                    explanation = st.text_input(
+                        "Erklärung", key="delete_fund_explanation"
+                    )
+                    transfer_to_fund = (
+                        session.query(Fund)
+                        .filter(Fund.name == transfer_to_fund_name)
+                        .first()
+                    )
+                    log_change(
+                        session,
+                        delete_fund_obj.id,
+                        "delete",
+                        explanation,
+                        delete_fund_obj.current_balance,
+                        None,
+                        "fund",
+                    )
+                    delete_fund(delete_fund_obj.id, transfer_to_fund.id, user.id)
+                    st.success(
+                        f"Fonds {delete_fund_name} gelöscht und verbleibender Saldo zu {transfer_to_fund_name} übertragen!"
+                    )
+
+    with st.expander("Neuen Fonds hinzufügen"):
+        with st.form("Neuen Fonds hinzufügen"):
+            new_fund_name = st.text_input("Fondsname", key="new_fund_name")
+            new_fund_yearly_target = st.number_input(
+                "Jährliches Ziel", min_value=0.0, key="new_fund_yearly_target"
+            )
+            explanation = st.text_input("Erklärung", key="new_fund_explanation")
+
+            b = st.form_submit_button("Fonds hinzufügen")
+        if b:
+            with Session() as session:
+                new_fund = Fund(
+                    name=new_fund_name,
+                    yearly_target=new_fund_yearly_target,
+                )
+                session.add(new_fund)
+                session.commit()
+                log_change(
+                    session,
+                    new_fund.id,
+                    "add",
+                    explanation,
+                    None,
+                    new_fund_yearly_target,
+                    "fund",
+                )
+                st.success(
+                    f"Fonds {new_fund_name} mit einem jährlichen Ziel von {new_fund_yearly_target} EUR hinzugefügt!"
+                )
 
 
 def show_deposits(role: Literal["admin", "user"], name: str):
@@ -977,7 +1029,7 @@ def show_distribution(user: Group):
 
 def show_expenses(role: Literal["admin", "user"], user: Group):
     st.header("Ausgabe aufzeichnen")
-    with st.form(key="ausgaben"):
+    with st.form(key="Ausgabenrückerstatung"):
         fund_name = (
             st.selectbox(
                 "Fonds",
@@ -1071,34 +1123,30 @@ if authentication_status:
 
     role = roles[name]
     with st.sidebar:
-        st.title("Cashbox-Verwaltungssystem")
+        st.title("Projekte-Miet-Verwaltung")
         authenticator.logout("Abmelden")
 
     tab_functions = {
         "Dashboard": show_dashboard,
         "Einzahlungen": show_deposits,
-        "Ausgaben": show_expenses,
-        "Bargeldverwaltung": show_cash_management,
+        "Ausgabenrückerstatung": show_expenses,
+        "Bargeldverwaltung": show_funds_management,
         "Mein Profil": show_user_profile,
     }
 
     admin_tabs = [
         "Dashboard",
-        "Einzahlungen",
-        "Verteilung",
-        "Ausgaben",
         "Bargeldverwaltung",
-        "Mein Profil",
-        "Personenverwaltung",
-        "Transaktionen bestätigen",
-        "Räume und Kategorien verwalten",
-        "Ausgaben verwalten",
+        "Kosten verwalten",
         "Bietrunde",
+        "Personenverwaltung",
+        "Räume und Kategorien verwalten",
+        "Mein Profil",
     ]
     user_tabs = [
         "Dashboard",
         "Einzahlungen",
-        "Ausgaben",
+        "Ausgabenrückerstatung",
         "Mein Profil",
         "Mietgebot abgeben",
     ]
@@ -1109,21 +1157,17 @@ if authentication_status:
 
     if selected_tab == "Einzahlungen":
         show_deposits(role, name)
-    elif selected_tab == "Ausgaben":
+    elif selected_tab == "Ausgabenrückerstatung":
         show_expenses(role, current_user)
-    elif selected_tab == "Verteilung" and role == "admin":
-        show_distribution(current_user)
     elif selected_tab == "Bargeldverwaltung" and role == "admin":
-        show_cash_management(current_user)
+        show_funds_management(current_user)
     elif selected_tab == "Personenverwaltung" and role == "admin":
         show_group_management()
     elif selected_tab == "Mein Profil":
         show_user_profile(current_user)
-    elif selected_tab == "Transaktionen bestätigen":
-        show_confirmation()
     elif selected_tab == "Räume und Kategorien verwalten":
         manage_rooms_and_categories()
-    elif selected_tab == "Ausgaben verwalten":
+    elif selected_tab == "Kosten verwalten":
         show_expenses_management()
     elif selected_tab == "Bietrunde":
         evaluate_bids_and_start_round()
