@@ -4,7 +4,7 @@ from typing import Optional, Literal, List, Dict, Tuple
 from datetime import datetime, timedelta, date
 import json
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, func
+from sqlalchemy import func
 from functools import lru_cache
 from streamlit_authenticator.utilities import hasher
 from models import (
@@ -16,9 +16,11 @@ from models import (
     BiddingStatus,
     MonthlyCash,
     MonthlyGiro,
+    engine,
+    ExpenseChangeLog,
 )
 
-engine = create_engine("sqlite:///cash_management.db")
+
 Session = sessionmaker(bind=engine)
 
 
@@ -406,3 +408,15 @@ def current_payments(group, session):
     giro = current_giro_payment.amount if current_giro_payment else 0
 
     return cash, giro
+
+
+def log_change(session, expense_id, change_type, details, previous_amount, new_amount):
+    change_log = ExpenseChangeLog(
+        expense_id=expense_id,
+        change_type=change_type,
+        details=details,
+        previous_amount=previous_amount,
+        new_amount=new_amount,
+    )
+    session.add(change_log)
+    session.commit()

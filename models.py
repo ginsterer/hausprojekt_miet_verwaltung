@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 
 Base = declarative_base()
-engine = create_engine("sqlite:///cash_management.db")
+engine = create_engine("sqlite:///cash_management-test.db")
 Session = sessionmaker(bind=engine)
 
 
@@ -150,6 +150,21 @@ class Expense(Base):
     name = Column(String, index=True)
     yearly_amount = Column(Float)
     type = Column(Enum("ancillary", "rent", name="rent_type"), nullable=False)
+    change_logs = relationship("ExpenseChangeLog", back_populates="expense")
+
+
+class ExpenseChangeLog(Base):
+    __tablename__ = "expense_change_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=False)
+    change_type = Column(
+        Enum("add", "edit", "delete", name="change_type"), nullable=False
+    )
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    details = Column(String, nullable=False)
+    previous_amount = Column(Float, nullable=True)
+    new_amount = Column(Float, nullable=True)
+    expense = relationship("Expense", back_populates="change_logs")
 
 
 class Transaction(Base):
