@@ -187,181 +187,187 @@ def show_user_profile(user: Group):
 
 
 def manage_rooms_and_categories():
-    st.header("Räume und Kategorien verwalten")
+    st.header("Räume und Bewohnerinnen verwalten")
+    with st.expander("Bewohnerinnen"):
+        show_group_management
+    with st.expander("Räume"):
 
-    with Session() as session:
-        # Rooms Management
-        st.subheader("Räume")
-        rooms = session.query(Room).all()
-        groups = session.query(Group).all()
+        with Session() as session:
+            # Rooms Management
+            st.subheader("Räume")
+            rooms = session.query(Room).all()
+            groups = session.query(Group).all()
 
-        st.write("Aktuelle Räume:")
-        room_data = [
-            {"ID": room.id, "Name": room.name, "Fläche": room.area} for room in rooms
-        ]
-        st.table(room_data)
+            st.write("Aktuelle Räume:")
+            room_data = [
+                {"ID": room.id, "Name": room.name, "Fläche": room.area}
+                for room in rooms
+            ]
+            st.table(room_data)
 
-        with st.form("add_room_form"):
-            new_room_name = st.text_input("Neuer Raumname")
-            new_room_area = st.number_input(
-                "Raumfläche (in Quadratmetern)", min_value=0.0
+            with st.form("add_room_form"):
+                new_room_name = st.text_input("Neuer Raumname")
+                new_room_area = st.number_input(
+                    "Raumfläche (in Quadratmetern)", min_value=0.0
+                )
+                add_room_submit = st.form_submit_button("Raum hinzufügen")
+
+                if add_room_submit and new_room_name:
+                    new_room = Room(name=new_room_name, area=new_room_area)
+                    session.add(new_room)
+                    session.commit()
+                    st.success("Neuer Raum hinzugefügt!")
+
+            # Edit or Delete Existing Rooms
+            st.subheader("Bestehende Räume bearbeiten oder löschen")
+            room_options = [(room.id, room.name) for room in rooms]
+            selected_room_id = st.selectbox(
+                "Raum auswählen zum Bearbeiten oder Löschen",
+                options=room_options,
+                format_func=lambda x: x[1],
             )
-            add_room_submit = st.form_submit_button("Raum hinzufügen")
 
-            if add_room_submit and new_room_name:
-                new_room = Room(name=new_room_name, area=new_room_area)
-                session.add(new_room)
-                session.commit()
-                st.success("Neuer Raum hinzugefügt!")
-
-        # Edit or Delete Existing Rooms
-        st.subheader("Bestehende Räume bearbeiten oder löschen")
-        room_options = [(room.id, room.name) for room in rooms]
-        selected_room_id = st.selectbox(
-            "Raum auswählen zum Bearbeiten oder Löschen",
-            options=room_options,
-            format_func=lambda x: x[1],
-        )
-
-        if selected_room_id:
-            selected_room = (
-                session.query(Room).filter(Room.id == selected_room_id[0]).first()
-            )
-            with st.form("edit_room_form"):
-                edit_room_name = st.text_input("Raumname", value=selected_room.name)
-                edit_room_area = st.number_input(
-                    "Raumfläche (in Quadratmetern)",
-                    value=selected_room.area,
-                    min_value=0.0,
+            if selected_room_id:
+                selected_room = (
+                    session.query(Room).filter(Room.id == selected_room_id[0]).first()
                 )
-                update_room_submit = st.form_submit_button("Raum aktualisieren")
-                delete_room_submit = st.form_submit_button("Raum löschen")
-
-                if update_room_submit:
-                    selected_room.name = edit_room_name
-                    selected_room.area = edit_room_area
-                    session.commit()
-                    st.success("Raum aktualisiert!")
-                if delete_room_submit:
-                    session.delete(selected_room)
-                    session.commit()
-                    st.success("Raum gelöscht!")
-
-            with st.form("manage_tenants_form"):
-                tenants = [tenant.name for tenant in selected_room.tenants]
-                st.write("Aktuelle Mieterinnen: " + ", ".join(tenants))
-                group_options = [(group.id, group.name) for group in groups]
-                selected_group_id = st.selectbox(
-                    "Gruppe auswählen",
-                    options=group_options,
-                    format_func=lambda x: x[1],
-                )
-                add_group_to_room_submit = st.form_submit_button(
-                    "Gruppe zum Raum hinzufügen"
-                )
-                remove_group_from_room_submit = st.form_submit_button(
-                    "Gruppe aus dem Raum entfernen"
-                )
-
-                if add_group_to_room_submit:
-                    selected_group = (
-                        session.query(Group)
-                        .filter(Group.id == selected_group_id[0])
-                        .first()
+                with st.form("edit_room_form"):
+                    edit_room_name = st.text_input("Raumname", value=selected_room.name)
+                    edit_room_area = st.number_input(
+                        "Raumfläche (in Quadratmetern)",
+                        value=selected_room.area,
+                        min_value=0.0,
                     )
-                    selected_room.tenants.append(selected_group)
-                    session.commit()
-                    st.success("Gruppe zum Raum hinzugefügt!")
+                    update_room_submit = st.form_submit_button("Raum aktualisieren")
+                    delete_room_submit = st.form_submit_button("Raum löschen")
 
-                if remove_group_from_room_submit:
-                    selected_group = (
-                        session.query(Group)
-                        .filter(Group.id == selected_group_id[0])
-                        .first()
+                    if update_room_submit:
+                        selected_room.name = edit_room_name
+                        selected_room.area = edit_room_area
+                        session.commit()
+                        st.success("Raum aktualisiert!")
+                    if delete_room_submit:
+                        session.delete(selected_room)
+                        session.commit()
+                        st.success("Raum gelöscht!")
+
+                with st.form("manage_tenants_form"):
+                    tenants = [tenant.name for tenant in selected_room.tenants]
+                    st.write("Aktuelle Mieterinnen: " + ", ".join(tenants))
+                    group_options = [(group.id, group.name) for group in groups]
+                    selected_group_id = st.selectbox(
+                        "Gruppe auswählen",
+                        options=group_options,
+                        format_func=lambda x: x[1],
                     )
-                    selected_room.tenants.remove(selected_group)
-                    session.commit()
-                    st.success("Gruppe aus dem Raum entfernt!")
+                    add_group_to_room_submit = st.form_submit_button(
+                        "Gruppe zum Raum hinzufügen"
+                    )
+                    remove_group_from_room_submit = st.form_submit_button(
+                        "Gruppe aus dem Raum entfernen"
+                    )
+
+                    if add_group_to_room_submit:
+                        selected_group = (
+                            session.query(Group)
+                            .filter(Group.id == selected_group_id[0])
+                            .first()
+                        )
+                        selected_room.tenants.append(selected_group)
+                        session.commit()
+                        st.success("Gruppe zum Raum hinzugefügt!")
+
+                    if remove_group_from_room_submit:
+                        selected_group = (
+                            session.query(Group)
+                            .filter(Group.id == selected_group_id[0])
+                            .first()
+                        )
+                        selected_room.tenants.remove(selected_group)
+                        session.commit()
+                        st.success("Gruppe aus dem Raum entfernt!")
 
         # PeopleCategory Management
-        st.subheader("Personenkategorien")
-        categories = session.query(PeopleCategory).all()
+        with st.expander("Personenekategorien"):
 
-        st.write("Aktuelle Kategorien:")
-        category_data = [
-            {
-                "ID": category.id,
-                "Name": category.name,
-                "Monatliches Grundbedarf": category.monthly_base_need,
-            }
-            for category in categories
-        ]
-        st.table(category_data)
+            st.subheader("Personenkategorien")
+            categories = session.query(PeopleCategory).all()
 
-        with st.form("add_category_form"):
-            new_category_name = st.text_input("Neue Kategorie Name")
-            new_category_income = st.number_input(
-                "Monatlicher Grundbedarf", min_value=0
-            )
-            new_category_head_count = st.number_input(
-                "Personenzählwert", value=1, min_value=0
-            )
-            add_category_submit = st.form_submit_button("Kategorie hinzufügen")
+            st.write("Aktuelle Kategorien:")
+            category_data = [
+                {
+                    "ID": category.id,
+                    "Name": category.name,
+                    "Monatliches Grundbedarf": category.monthly_base_need,
+                }
+                for category in categories
+            ]
+            st.table(category_data)
 
-            if add_category_submit and new_category_name:
-                new_category = PeopleCategory(
-                    name=new_category_name,
-                    monthly_base_need=new_category_income,
-                    head_count=new_category_head_count,
+            with st.form("add_category_form"):
+                new_category_name = st.text_input("Neue Kategorie Name")
+                new_category_income = st.number_input(
+                    "Monatlicher Grundbedarf", min_value=0
                 )
-                session.add(new_category)
-                session.commit()
-                st.success("Neue Kategorie hinzugefügt!")
+                new_category_head_count = st.number_input(
+                    "Personenzählwert", value=1, min_value=0
+                )
+                add_category_submit = st.form_submit_button("Kategorie hinzufügen")
 
-        # Edit or Delete Existing Categories
-        st.subheader("Bestehende Kategorien bearbeiten oder löschen")
-        category_options = [(cat.id, cat.name) for cat in categories]
-        selected_category_id = st.selectbox(
-            "Kategorie auswählen zum Bearbeiten oder Löschen",
-            options=category_options,
-            format_func=lambda x: x[1],
-        )
-
-        if selected_category_id:
-            selected_category = (
-                session.query(PeopleCategory)
-                .filter(PeopleCategory.id == selected_category_id[0])
-                .first()
-            )
-            with st.form("edit_category_form"):
-                edit_category_name = st.text_input(
-                    "Kategorie Name", value=selected_category.name
-                )
-                edit_category_income = st.number_input(
-                    "Monatlicher Grundbedarf",
-                    value=selected_category.monthly_base_need,
-                    min_value=0,
-                )
-                edit_category_head_count = st.number_input(
-                    "Personenzählwert",
-                    value=float(selected_category.head_count),
-                    min_value=0.0,
-                )
-                update_category_submit = st.form_submit_button(
-                    "Kategorie aktualisieren"
-                )
-                delete_category_submit = st.form_submit_button("Kategorie löschen")
-
-                if update_category_submit:
-                    selected_category.name = edit_category_name
-                    selected_category.monthly_base_need = edit_category_income
-                    selected_category.head_count = edit_category_head_count
+                if add_category_submit and new_category_name:
+                    new_category = PeopleCategory(
+                        name=new_category_name,
+                        monthly_base_need=new_category_income,
+                        head_count=new_category_head_count,
+                    )
+                    session.add(new_category)
                     session.commit()
-                    st.success("Kategorie aktualisiert!")
-                if delete_category_submit:
-                    session.delete(selected_category)
-                    session.commit()
-                    st.success("Kategorie gelöscht!")
+                    st.success("Neue Kategorie hinzugefügt!")
+
+            # Edit or Delete Existing Categories
+            st.subheader("Bestehende Kategorien bearbeiten oder löschen")
+            category_options = [(cat.id, cat.name) for cat in categories]
+            selected_category_id = st.selectbox(
+                "Kategorie auswählen zum Bearbeiten oder Löschen",
+                options=category_options,
+                format_func=lambda x: x[1],
+            )
+
+            if selected_category_id:
+                selected_category = (
+                    session.query(PeopleCategory)
+                    .filter(PeopleCategory.id == selected_category_id[0])
+                    .first()
+                )
+                with st.form("edit_category_form"):
+                    edit_category_name = st.text_input(
+                        "Kategorie Name", value=selected_category.name
+                    )
+                    edit_category_income = st.number_input(
+                        "Monatlicher Grundbedarf",
+                        value=selected_category.monthly_base_need,
+                        min_value=0,
+                    )
+                    edit_category_head_count = st.number_input(
+                        "Personenzählwert",
+                        value=float(selected_category.head_count),
+                        min_value=0.0,
+                    )
+                    update_category_submit = st.form_submit_button(
+                        "Kategorie aktualisieren"
+                    )
+                    delete_category_submit = st.form_submit_button("Kategorie löschen")
+
+                    if update_category_submit:
+                        selected_category.name = edit_category_name
+                        selected_category.monthly_base_need = edit_category_income
+                        selected_category.head_count = edit_category_head_count
+                        session.commit()
+                        st.success("Kategorie aktualisiert!")
+                    if delete_category_submit:
+                        session.delete(selected_category)
+                        session.commit()
+                        st.success("Kategorie gelöscht!")
 
 
 def evaluate_bids_and_start_round():
@@ -621,7 +627,7 @@ def submit_rent_bid(user: Group):
 
 
 def show_group_management():
-    st.header("Personenverwaltung")
+    st.subheader("Personenverwaltung")
 
     # Neue Person hinzufügen
     with st.expander("Neue Person hinzufügen"):
@@ -672,30 +678,6 @@ def show_group_management():
                     group.active = False
                     session.commit()
                     st.success(f"Person {group.name} deaktiviert!")
-
-        # Monatliche Beträge für alle Personen hinzufügen
-        st.subheader("Monatliche Beträge für alle Personen hinzufügen")
-        monthly_amounts = {}
-        start_date = st.date_input(
-            "Startdatum", value=date.today(), key="monthly_start_date_all"
-        )
-        end_date = st.date_input(
-            "Enddatum", value=date.today(), key="monthly_end_date_all"
-        )
-
-        for group in groupen:
-            monthly_amounts[group.id] = st.number_input(
-                f"Betrag für {group.name}",
-                min_value=0,
-                step=10,
-                key=f"monthly_amount_{group.id}",
-            )
-
-        if st.button("Monatliche Beträge hinzufügen"):
-            for group_id, amount in monthly_amounts.items():
-                if amount > 0:
-                    add_monthly_amount(group_id, amount, start_date, end_date)
-            st.success("Monatliche Beträge hinzugefügt!")
 
 
 def show_expenses_management():
