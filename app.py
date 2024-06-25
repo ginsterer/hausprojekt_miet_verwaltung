@@ -1143,11 +1143,9 @@ if authentication_status:
         show_expenses(role, current_user)
     elif selected_tab == "Bargeldverwaltung" and role == "admin":
         show_funds_management(current_user)
-    elif selected_tab == "Personenverwaltung" and role == "admin":
-        show_group_management()
     elif selected_tab == "Mein Profil":
         show_user_profile(current_user)
-    elif selected_tab == "Räume und Kategorien verwalten":
+    elif selected_tab == "Räume und Bewohner*innen":
         manage_rooms_and_categories()
     elif selected_tab == "Kosten verwalten":
         show_expenses_management()
