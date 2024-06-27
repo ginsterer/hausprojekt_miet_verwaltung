@@ -35,6 +35,8 @@ from models import (
     BiddingStatus,
     Bid,
     Expense,
+    ExpenseChangeLog,
+    FundChangeLog,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -74,51 +76,218 @@ name, authentication_status, _ = authenticator.login("main")
 
 def show_dashboard():
     st.header("Dashboard")
+    with st.expander("Gesamtmiete Entwicklung"):
 
-    if st.button("Aktualisieren"):
-        with Session() as session:
-            confirmed_transactions = (
-                session.query(Transaction).filter(Transaction.confirmed == True).all()
-            )
-            transactions_data = [
-                {
-                    "Datum": transaction.date,
-                    "Fonds": transaction.fund.name,
-                    "Betrag": transaction.amount,
-                    "Person": transaction.group.name,
-                    "Kommentar": transaction.comment,
-                }
-                for transaction in confirmed_transactions
-            ]
+        if st.button("Aktualisieren", key="rent_plot"):
+            # Call the function to display the plot
+            st.plotly_chart(plot_rent_development())
 
-        df = pd.DataFrame(transactions_data)
-        df["Datum"] = pd.to_datetime(df["Datum"])
-        df.sort_values(by="Datum", inplace=True)
+    with st.expander(
+        "Fonds Übersicht",
+    ):
+        if st.button("Aktualisieren", key="fund_plot"):
+            fig = plot_funds()
 
-        date_range = pd.date_range(start=df["Datum"].min(), end=df["Datum"].max())
-        funds = df["Fonds"].unique()
+            st.plotly_chart(fig)
+
+
+def plot_funds():
+    with Session() as session:
+        confirmed_transactions = (
+            session.query(Transaction).filter(Transaction.confirmed == True).all()
+        )
+        transactions_data = [
+            {
+                "Datum": transaction.date,
+                "Fonds": transaction.fund.name,
+                "Betrag": transaction.amount,
+                "Person": transaction.group.name,
+                "Kommentar": transaction.comment,
+            }
+            for transaction in confirmed_transactions
+        ]
+    df = pd.DataFrame(transactions_data)
+    df["Datum"] = pd.to_datetime(df["Datum"])
+    df.sort_values(by="Datum", inplace=True)
+    date_range = pd.date_range(start=df["Datum"].min(), end=df["Datum"].max())
+    funds = df["Fonds"].unique()
+    complete_df = pd.MultiIndex.from_product(
+        [date_range, funds], names=["Datum", "Fonds"]
+    ).to_frame(index=False)
+    df = pd.merge(complete_df, df, on=["Datum", "Fonds"], how="left").sort_values(
+        by=["Datum", "Fonds"]
+    )
+    df["Betrag"].fillna(0, inplace=True)
+    df["Saldo"] = df.groupby("Fonds")["Betrag"].cumsum()
+    df["Person"].fillna(method="ffill", inplace=True)
+    df["Kommentar"].fillna(method="ffill", inplace=True)
+    fig = px.area(
+        df,
+        x="Datum",
+        y="Saldo",
+        color="Fonds",
+        title="Fonds-Salden im Zeitverlauf",
+        hover_data={"Betrag": True, "Person": True, "Kommentar": True},
+    )
+    return fig
+
+
+def plot_rent_development():
+    with Session() as session:
+        # Retrieve change logs for expenses and funds
+        expense_logs = session.query(ExpenseChangeLog).all()
+        fund_logs = session.query(FundChangeLog).all()
+
+        # Retrieve current values for expenses and funds
+        current_expenses = session.query(Expense).all()
+        current_funds = session.query(Fund).all()
+
+        # Process expense logs
+        expense_data = [
+            {
+                "date": log.timestamp,
+                "name": log.expense.name,
+                "amount": log.new_amount - (log.previous_amount or 0),
+                "type": "expense",
+                "details": log.details,
+            }
+            for log in expense_logs
+        ]
+
+        # Process fund logs
+        fund_data = [
+            {
+                "date": log.timestamp,
+                "name": log.fund.name,
+                "amount": log.new_amount - (log.previous_amount or 0),
+                "type": "fund",
+                "details": log.details,
+            }
+            for log in fund_logs
+        ]
+
+        # Combine data
+        data = expense_data + fund_data
+        df = pd.DataFrame(data)
+
+        # Display overview of changes in a scrollable table
+        st.subheader("Übersicht der Änderungen")
+        st.dataframe(df[["date", "name", "amount", "details"]])
+
+        # Ensure data points for all expenses and funds at each timestamp
+        all_names = [expense.name for expense in current_expenses] + [
+            fund.name for fund in current_funds
+        ]
+        date_range = pd.date_range(
+            start=df["date"].min(), end=df["date"].max(), inclusive="both"
+        )
+        df["date"] = df["date"].dt.normalize()
+        df = df.groupby(["date", "name"]).sum().reindex()
+
         complete_df = pd.MultiIndex.from_product(
-            [date_range, funds], names=["Datum", "Fonds"]
+            [date_range, all_names], names=["date", "name"]
         ).to_frame(index=False)
-        df = pd.merge(complete_df, df, on=["Datum", "Fonds"], how="left").sort_values(
-            by=["Datum", "Fonds"]
+        df = pd.merge(complete_df, df, on=["date", "name"], how="left").sort_values(
+            by=["date", "name"]
         )
 
-        df["Betrag"].fillna(0, inplace=True)
-        df["Saldo"] = df.groupby("Fonds")["Betrag"].cumsum()
-        df["Person"].fillna(method="ffill", inplace=True)
-        df["Kommentar"].fillna(method="ffill", inplace=True)
+        # Fill missing values
+        df["amount"].fillna(0, inplace=True)
+        # Calculate cumulative sum per month
+        df["cumulative_amount"] = df.groupby(["name"])["amount"].cumsum() / 12
 
+        # Display current total rent per month
+        st.subheader("Aktuelle Gesamtmiete pro Monat")
+        # Calculate current total rent per month
+        current_total_rent = df.loc[
+            df["date"] == df["date"].max(), "cumulative_amount"
+        ].sum()
+        st.write(
+            f"Die aktuelle Gesamtmiete pro Monat beträgt: {current_total_rent:.2f} EUR"
+        )
+
+        # Plot using Plotly
         fig = px.area(
             df,
-            x="Datum",
-            y="Saldo",
-            color="Fonds",
-            title="Fonds-Salden im Zeitverlauf",
-            hover_data={"Betrag": True, "Person": True, "Kommentar": True},
+            x="date",
+            y="cumulative_amount",
+            color="name",
+            title="Entwicklung der Miete",
         )
 
-        st.plotly_chart(fig)
+        return fig
+
+
+#
+# def plot_development():
+#     with Session() as session:
+#         # Retrieve change logs for expenses and funds
+#         expense_logs = session.query(ExpenseChangeLog).all()
+#         fund_logs = session.query(FundChangeLog).all()
+#
+#         # Retrieve current values for expenses and funds
+#         current_expenses = session.query(Expense).all()
+#         current_funds = session.query(Fund).all()
+#
+#         # Process expense logs
+#         expense_data = [
+#             {
+#                 "date": log.timestamp,
+#                 "name": session.query(Expense)
+#                 .filter(Expense.id == log.expense_id)
+#                 .first()
+#                 .name,
+#                 "amount": log.new_amount - (log.previous_amount or 0),
+#                 "type": "expense",
+#             }
+#             for log in expense_logs
+#         ]
+#
+#         # Process fund logs
+#         fund_data = [
+#             {
+#                 "date": log.timestamp,
+#                 "name": session.query(Fund).filter(Fund.id == log.fund_id).first().name,
+#                 "amount": log.new_amount - (log.previous_amount or 0),
+#                 "type": "fund",
+#             }
+#             for log in fund_logs
+#         ]
+#
+#         # Combine data
+#         data = expense_data + fund_data
+#         df = pd.DataFrame(data)
+#
+#         # Ensure data points for all expenses and funds at each timestamp
+#         all_names = [expense.name for expense in current_expenses] + [
+#             fund.name for fund in current_funds
+#         ]
+#         date_range = pd.date_range(
+#             start=df["date"].min(), end=df["date"].max(), freq="M"
+#         )
+#         complete_df = pd.MultiIndex.from_product(
+#             [date_range, all_names], names=["date", "name"]
+#         ).to_frame(index=False)
+#         df = pd.merge(complete_df, df, on=["date", "name"], how="left").sort_values(
+#             by=["date", "name"]
+#         )
+#
+#         # Fill missing values
+#         df["amount"].fillna(0, inplace=True)
+#
+#         # Calculate cumulative sum per month
+#         df["cumulative_amount"] = df.groupby(["name"])["amount"].cumsum()
+#
+#         # Plot using Plotly
+#         fig = px.area(
+#             df,
+#             x="date",
+#             y="cumulative_amount",
+#             color="name",
+#             title="Entwicklung der Miete",
+#         )
+#         st.plotly_chart(fig)
+#
 
 
 def show_user_profile(user: Group):
@@ -713,7 +882,7 @@ def show_expenses_management():
                         explanation,
                         None,
                         new_expense_amount,
-                        "expence",
+                        "expense",
                     )
                     st.success(f"Ausgabe {new_expense_name} hinzugefügt!")
 
@@ -760,7 +929,7 @@ def show_expenses_management():
                             explanation,
                             old_amount,
                             edit_amount,
-                            "expence",
+                            "expense",
                         )
                         st.success(f"Änderungen für {expense.name} gespeichert!")
 
@@ -775,7 +944,7 @@ def show_expenses_management():
                             explanation,
                             expense.yearly_amount,
                             None,
-                            "expence",
+                            "expense",
                         )
                         session.delete(expense)
                         session.commit()
