@@ -16,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 
 Base = declarative_base()
-engine = create_engine("sqlite:///cash_management-test.db")
+engine = create_engine("sqlite:///cash_management.db")
 Session = sessionmaker(bind=engine)
 
 

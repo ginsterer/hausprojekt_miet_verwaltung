@@ -106,6 +106,18 @@ def plot_funds():
             }
             for transaction in confirmed_transactions
         ]
+        funds_data = session.query(Fund).all()
+        funds_overview = [
+            {
+                "Fonds": fund.name,
+                "Aktueller Saldo": sum(
+                    t.amount for t in fund.transactions if t.confirmed
+                ),
+                "Jährliches Ziel": fund.yearly_target,
+            }
+            for fund in funds_data
+        ]
+
     df = pd.DataFrame(transactions_data)
     df["Datum"] = pd.to_datetime(df["Datum"])
     df.sort_values(by="Datum", inplace=True)
@@ -117,10 +129,13 @@ def plot_funds():
     df = pd.merge(complete_df, df, on=["Datum", "Fonds"], how="left").sort_values(
         by=["Datum", "Fonds"]
     )
+    df.sort_values(by=["Fonds", "Datum"], inplace=True)
     df["Betrag"].fillna(0, inplace=True)
     df["Saldo"] = df.groupby("Fonds")["Betrag"].cumsum()
     df["Person"].fillna(method="ffill", inplace=True)
     df["Kommentar"].fillna(method="ffill", inplace=True)
+
+    # Create the plot
     fig = px.area(
         df,
         x="Datum",
@@ -129,6 +144,10 @@ def plot_funds():
         title="Fonds-Salden im Zeitverlauf",
         hover_data={"Betrag": True, "Person": True, "Kommentar": True},
     )
+
+    # Display the overview table
+    st.table(pd.DataFrame(funds_overview))
+
     return fig
 
 
