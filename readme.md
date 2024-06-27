@@ -37,7 +37,7 @@ The primary purpose of this application is to facilitate the management of commu
 ## Installation
 1. Clone the repository:
     ```sh
-    git clone <repository-url>
+    git clone https://github.com/ginsterer/hausprojekt_miet_verwaltung
     ```
 2. Install dependencies:
     ```sh
