@@ -325,7 +325,7 @@ def show_user_profile(user: Group):
                 ):
                     st.info(
                         """#### Was muss ich hier angeben?
-Am Ende geht es um die Summe, die monatlich auf eurem Konto landet abzüglich von Betreuungskosten (Kita, Hort) und allem was den Unterschied zwischen Brutto und Nettolohn macht (Kranken- ,Pflegeversichrung, Steuern Renteneinzahlung ...). Wenn du also angestellt bist einfach deinen Nettolohn minus Betreuungskosten. Wer von Vermögen lebt, rechnet mit ein, wie viel er oder sie davon im Monat nutzt.
+Am Ende geht es um die Summe, die monatlich auf eurem Konto landet abzüglich von Betreuungskosten (Kita, Hort) und allem was den Unterschied zwischen Brutto und Nettolohn macht (Kranken- ,Pflegeversichrung, Steuern Renteneinzahlung ...). Wenn du also angestellt bist also z.B. deinen Nettolohn plus Kindergeld minus Betreuungskosten. Wer von Vermögen lebt, rechnet mit ein, wie viel er oder sie davon im Monat nutzt.
 #### Beschreibung der Berechnung des verfügbaren Einkommens für die Mietberechnung
 Das verfügbare Einkommen eurer Gruppe wird berechnet, indem das Gesamteinkommen eurer Gruppe abzüglich des monatlichen Grundbedarfs aller Personen ermittelt wird. Der monatliche Grundbedarf jeder Person basiert auf ihrer Kategorie, die je nach Bedürfnis unterschiedlich sein kann (z.B. Erwachsene vs. Kinder).
 
@@ -393,6 +393,7 @@ Diese Berechnung berücksichtigt die unterschiedlichen Bedürfnisse der Mitglied
                 group.rooms.append(room_to_add)
                 session.commit()
                 st.success(f"Raum {room_to_add.name} hinzugefügt!")
+                st.rerun()
 
             st.subheader("Mitglieder")
             current_members = [
@@ -414,6 +415,7 @@ Diese Berechnung berücksichtigt die unterschiedlichen Bedürfnisse der Mitglied
                 session.add(new_person)
                 session.commit()
                 st.success("Mitglied hinzugefügt!")
+                st.rerun()
 
 
 def manage_rooms_and_categories():
