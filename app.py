@@ -318,7 +318,49 @@ def show_user_profile(user: Group):
         if group:
             new_name = st.text_input("Name", value=group.name)
             new_password = st.text_input("Passwort", type="password")
-            new_income = st.number_input("Einkommen", value=group.income)
+            col1, col2 = st.columns(2)
+            with col2:
+                with st.popover(
+                    "ℹ",
+                ):
+                    st.info(
+                        """#### Was muss ich hier angeben?
+Am Ende geht es um die Summe, die monatlich auf eurem Konto landet abzüglich von Betreuungskosten (Kita, Hort) und allem was den Unterschied zwischen Brutto und Nettolohn macht (Kranken- ,Pflegeversichrung, Steuern Renteneinzahlung ...). Wenn du also angestellt bist einfach deinen Nettolohn minus Betreuungskosten. Wer von Vermögen lebt, rechnet mit ein, wie viel er oder sie davon im Monat nutzt.
+#### Beschreibung der Berechnung des verfügbaren Einkommens für die Mietberechnung
+Das verfügbare Einkommen eurer Gruppe wird berechnet, indem das Gesamteinkommen eurer Gruppe abzüglich des monatlichen Grundbedarfs aller Personen ermittelt wird. Der monatliche Grundbedarf jeder Person basiert auf ihrer Kategorie, die je nach Bedürfnis unterschiedlich sein kann (z.B. Erwachsene vs. Kinder).
+
+##### Schritte der Berechnung
+1. Einkommen der Gruppe: Jede Gruppe hat ein Gesamteinkommen.
+
+2. Monatlicher Grundbedarf der Mitglieder: Jede Person gehört einer Kategorie an, die einen spezifischen monatlichen Grundbedarf festlegt.
+
+3. Gesamtgrundbedarf: Der gesamte monatliche Grundbedarf der Gruppe wird durch die Summe der Grundbedarfe aller Mitglieder berechnet.
+
+4. Verfügbares Einkommen: Das verfügbare Einkommen ergibt sich aus der Differenz zwischen dem Gesamteinkommen und dem gesamten monatlichen Grundbedarf.
+
+##### Berücksichtigung von Kindern
+Kinder haben in der Regel einen geringeren monatlichen Grundbedarf und eine andere Gewichtung als Erwachsene, wodurch sie finanziell anders berücksichtigt werden.
+
+##### Beispielberechnung
+Gesamteinkommen der Gruppe: 3000 €
+Mitglieder: 2 Erwachsene und 2 Kinder
+Kategorien:
+
+Erwachsene: monatlicher Grundbedarf = 500 €
+Kinder: monatlicher Grundbedarf = 300 €
+Berechnung:
+
+2 Erwachsene: 2 * 500 € = 1000 €
+2 Kinder: 2 * 300 € = 600 €
+Gesamtgrundbedarf: 1000 € + 600 € = 1600 €
+
+Verfügbares Einkommen: 3000 € - 1600 € = 1400 €
+
+Diese Berechnung berücksichtigt die unterschiedlichen Bedürfnisse der Mitglieder, einschließlich der Kinder, und stellt sicher, dass das verbleibende Einkommen fair verteilt wird.
+    """
+                    )
+            with col1:
+                new_income = st.number_input("Einkommen", value=group.income)
 
             if st.button("Eingabe bestätigen"):
                 group.name = new_name
@@ -673,7 +715,24 @@ def start_new_bidding_round(session, previous_bidding_status):
 
 
 def submit_rent_bid(user: Group):
-    st.header("Mietberechnung")
+    with st.popover(
+        "# Mietberechnung &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ℹ",
+        use_container_width=True,
+    ):
+        st.info(
+            """
+            Miete basierend auf Fläche:
+Diese Berechnung berücksichtigt die gesamte Fläche, die von der Gruppe genutzt wird. Dabei wird auch die Fläche einbezogen, die von allen Gruppen gemeinsam genutzt wird (wenn ein Raum keine spezifischen Mieter hat, wird er als gemeinschaftlich genutzt betrachtet). Die Miete wird anteilig zur genutzten Fläche und zur Kopfzahl der Gruppe im Verhältnis zur Gesamtkopfzahl aller Gruppen aufgeteilt. Dies bedeutet, dass eine Gruppe, die mehr Fläche nutzt oder mehr Mitglieder hat, einen höheren Mietanteil zahlt.
+
+Miete basierend auf Kopfzahl:
+Bei dieser Berechnung wird die Miete proportional zur Anzahl der Personen der Gruppe im Verhältnis zur Gesamtzahl der Mitglieder aller aktiven Gruppen aufgeteilt. Dies bedeutet, dass eine größere Gruppe (mit mehr Menschen) mehr Miete zahlt, unabhängig von der genutzten Fläche oder ihrem Einkommen.
+
+Miete basierend auf verfügbarem Einkommen:
+Diese Berechnung teilt die Miete proportional zum verfügbaren Einkommen der Gruppe im Verhältnis zum Gesamteinkommen aller aktiven Gruppen auf. Das verfügbare Einkommen jeder Gruppe wird berücksichtigt, sodass Gruppen mit höherem Einkommen einen größeren Anteil der Miete tragen. Dies stellt sicher, dass die Miete basierend auf der finanziellen Leistungsfähigkeit der Gruppen verteilt wird.
+
+Diese drei Berechnungen bieten verschiedene Ansätze zur fairen Verteilung der Mietkosten und können je nach Bedarf und Vereinbarung der Gruppen unterschiedlich gewichtet oder kombiniert werden.
+        """
+        )
 
     with Session() as session:
         # Check if all active groups were updated in the last month
@@ -1183,7 +1242,17 @@ def show_deposits(role: Literal["admin", "user"], name: str):
 
 
 def show_distribution(user: Group):
-    st.header("Einzahlungen verteilen")
+    with st.popover(
+        "# Einzahlungen Verteilen &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ℹ",
+        use_container_width=True,
+    ):
+        st.info(
+            """
+            Verteile die Summe im Einzahlungsfonds auf alle Fonds proportional zu ihren jährlichen Zielbeträgen.
+            Transaktionen müssen noch bestätigt werden.
+        """
+        )
+
     with Session() as session:
         deposit_fund = (
             session.query(Fund).filter(Fund.name == "Einzahlungsfonds").first()
@@ -1226,7 +1295,17 @@ def show_expenses(role: Literal["admin", "user"], user: Group):
 
 
 def show_confirmation():
-    st.header("Bestätigungen")
+    with st.popover(
+        "# Bestätigungen &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ℹ",
+        use_container_width=True,
+    ):
+        st.info(
+            """
+            Die Bestätigung einer Transaktion bedeutet, dass die Transaktion überprüft und als korrekt anerkannt wurde. 
+            Nach der Bestätigung wird der Betrag dem entsprechenden Fonds gutgeschrieben.
+        """
+        )
+
     with Session() as session:
         unconfirmed_transactions = (
             session.query(Transaction).filter(Transaction.confirmed == False).all()
@@ -1273,7 +1352,6 @@ def show_confirmation():
 
                     with cols[5]:
                         if st.button("Löschen", key=f"delete_{transaction.id}"):
-
                             for trans in transactions:
                                 session.delete(trans)
                             session.commit()
