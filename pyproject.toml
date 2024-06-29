@@ -6,7 +6,7 @@ authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "3.11"
+python = "^3.11"
 SQLAlchemy = "^2.0.30"
 streamlit = "^1.35.0"
 streamlit-authenticator = "^0.3.2"
