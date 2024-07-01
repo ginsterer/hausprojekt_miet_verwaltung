@@ -918,7 +918,7 @@ def show_group_management():
             # Prepare data for st.data_editor
             data = []
             for group in groups:
-                members = ", ".join([member.name for member in group.members])
+                members = ", ".join([member.category.name for member in group.members])
                 rooms = ", ".join([room.name for room in group.rooms])
                 data.append(
                     {
