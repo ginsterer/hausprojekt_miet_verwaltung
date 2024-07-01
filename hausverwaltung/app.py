@@ -922,6 +922,7 @@ def show_group_management():
                 rooms = ", ".join([room.name for room in group.rooms])
                 data.append(
                     {
+                        "ID": group.id,
                         "Name": group.name,
                         "Rolle": group.role,
                         "Einkommen": group.income,
@@ -938,6 +939,7 @@ def show_group_management():
                 key="group_editor",
                 disabled=("Mitglieder", "Räume"),
                 hide_index=True,
+                column_config={"ID": None},
             )
             button = st.form_submit_button("Änderungen speichern")
         # Save changes
