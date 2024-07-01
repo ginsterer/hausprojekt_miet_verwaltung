@@ -371,51 +371,58 @@ Diese Berechnung berücksichtigt die unterschiedlichen Bedürfnisse der Mitglied
                 session.commit()
                 st.success("Profil aktualisiert!")
 
-            st.subheader("Räume")
-            current_rooms = [room.name for room in group.rooms]
-            st.write("Aktuelle Räume:", ", ".join(current_rooms))
-
             all_rooms = session.query(Room).all()
-            available_rooms = [
-                (room.id, room.name)
-                for room in all_rooms
-                if room.name not in current_rooms
-            ]
-            selected_room = st.selectbox(
-                "Neuen Raum hinzufügen",
-                options=available_rooms,
-                format_func=lambda x: x[1],
-            )
-            if st.button("Raum hinzufügen"):
-                room_to_add = (
-                    session.query(Room).filter(Room.id == selected_room[0]).first()
+            all_categories = session.query(PeopleCategory).all()
+            with st.form("Räume"):
+                selected_rooms = st.multiselect(
+                    "Gemietete Räume",
+                    options=all_rooms,
+                    default=group.rooms,
+                    format_func=lambda x: x.name,
                 )
-                group.rooms.append(room_to_add)
-                session.commit()
-                st.success(f"Raum {room_to_add.name} hinzugefügt!")
-                st.rerun()
 
-            st.subheader("Mitglieder")
+                if st.form_submit_button("Speichern"):
+                    group.rooms = selected_rooms
+                    session.commit()
+                    st.success(f"Räume aktualisiert!")
+                    st.rerun()
+
             current_members = [
                 (member.id, member.category.name) for member in group.members
             ]
-            st.write("Aktuelle Mitglieder:")
-            for member in current_members:
-                st.write(f"ID: {member[0]}, Kategorie: {member[1]}")
 
-            all_categories = session.query(PeopleCategory).all()
-            available_categories = [(cat.id, cat.name) for cat in all_categories]
-            selected_category = st.selectbox(
-                "Kategorie für neues Mitglied",
-                options=available_categories,
-                format_func=lambda x: x[1],
-            )
-            if st.button("Mitglied hinzufügen"):
-                new_person = Person(category_id=selected_category[0], group_id=group.id)
-                session.add(new_person)
-                session.commit()
-                st.success("Mitglied hinzugefügt!")
-                st.rerun()
+            # Count the number of members per category
+            category_counts = {}
+            for member in group.members:
+                category_name = member.category.name
+                if category_name not in category_counts:
+                    category_counts[category_name] = 0
+                category_counts[category_name] += 1
+            with st.form("members"):
+                st.write("Aktuelle Mitglieder")
+                # Select number of members per category
+                category_selection = {}
+                for category in all_categories:
+                    count = st.number_input(
+                        f"Anzahl der Mitglieder für Kategorie '{category.name}'",
+                        min_value=0,
+                        value=category_counts.get(category.name, 0),
+                        step=1,
+                    )
+                    category_selection[category.id] = count
+
+                if st.form_submit_button("Mitglieder aktualisieren"):
+                    # Update group members based on selection
+                    session.query(Person).filter(Person.group_id == group.id).delete()
+                    for category_id, count in category_selection.items():
+                        for _ in range(count):
+                            new_person = Person(
+                                category_id=category_id, group_id=group.id
+                            )
+                            session.add(new_person)
+                    session.commit()
+                    st.success("Mitglieder aktualisiert!")
+                    st.rerun()
 
 
 def manage_rooms_and_categories():
