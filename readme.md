@@ -34,16 +34,16 @@ The primary purpose of this application is to facilitate the management of commu
 - **Navigate**: Use the sidebar to access different features based on user roles.
 - **Manage Finances**: Admins manage funds and expenses, while users manage their profiles and submit expenses.
 
-## Installation
+## Installation with docker
 1. Clone the repository:
     ```sh
     git clone https://github.com/ginsterer/hausprojekt_miet_verwaltung
     ```
-2. Install dependencies:
+2. Build Docker image:
     ```sh
-    poetry install
+    docker build -t hausverwaltung .
     ```
-3. Run the application:
+3. Run the container:
     ```sh
-    streamlit run app.py
+    docker run -v /path/to/your/database.db:/app/hausverwaltung/database.db -p 8501:8501 hausverwaltung
     ```
