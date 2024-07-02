@@ -382,10 +382,12 @@ Diese Berechnung berücksichtigt die unterschiedlichen Bedürfnisse der Mitglied
                 )
 
                 if st.form_submit_button("Speichern"):
-                    group.rooms = selected_rooms
+                    selected_room_ids = [room.id for room in selected_rooms]
+                    group.rooms = (
+                        session.query(Room).where(Room.id.in_(selected_room_ids)).all()
+                    )
                     session.commit()
                     st.success(f"Räume aktualisiert!")
-                    st.rerun()
 
             current_members = [
                 (member.id, member.category.name) for member in group.members
@@ -473,7 +475,7 @@ def room_management(session):
         )
 
         if selected_room_id:
-            selected_room = (
+            selected_room: Room = (
                 session.query(Room).filter(Room.id == selected_room_id[0]).first()
             )
             with st.form("edit_room_form"):
@@ -483,12 +485,26 @@ def room_management(session):
                     value=selected_room.area,
                     min_value=0.0,
                 )
+
+                selected_tenants = st.multiselect(
+                    "Mieterinnen",
+                    options=groups,
+                    default=selected_room.tenants,
+                    format_func=lambda x: x.name,
+                )
+
                 update_room_submit = st.form_submit_button("Raum aktualisieren")
                 delete_room_submit = st.form_submit_button("Raum löschen")
 
                 if update_room_submit:
                     selected_room.name = edit_room_name
                     selected_room.area = edit_room_area
+                    selected_tenant_ids = [tenant.id for tenant in selected_tenants]
+                    selected_room.tenants = (
+                        session.query(Group)
+                        .where(Group.id.in_(selected_tenant_ids))
+                        .all()
+                    )
                     session.commit()
                     st.success("Raum aktualisiert!")
                 if delete_room_submit:
