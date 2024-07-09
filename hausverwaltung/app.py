@@ -183,6 +183,7 @@ def plot_rent_development():
                 "details": log.details,
             }
             for log in fund_logs
+            if log.fund is not None
         ]
 
         # Combine data
@@ -936,6 +937,7 @@ def show_group_management():
             for group in groups:
                 members = ", ".join([member.category.name for member in group.members])
                 rooms = ", ".join([room.name for room in group.rooms])
+                rent_calcs = calculate_rent_for_group(group.id)
                 data.append(
                     {
                         "ID": group.id,
@@ -945,6 +947,9 @@ def show_group_management():
                         "Mitglieder": members,
                         "Räume": rooms,
                         "Passwort": group.password,
+                        "Miete Kopf": rent_calcs["by_head_count"],
+                        "Miete Fläche": rent_calcs["by_area"],
+                        "Miete Einkommen": rent_calcs["by_available_income"],
                     }
                 )
 
@@ -953,7 +958,13 @@ def show_group_management():
                 df,
                 num_rows="fixed",
                 key="group_editor",
-                disabled=("Mitglieder", "Räume"),
+                disabled=(
+                    "Mitglieder",
+                    "Räume",
+                    "Miete Kopf",
+                    "Miete Fläche",
+                    "Miete Einkommen",
+                ),
                 hide_index=True,
                 column_config={"ID": None},
             )
@@ -1018,70 +1029,96 @@ def show_expenses_management():
                         "expense",
                     )
                     st.success(f"Ausgabe {new_expense_name} hinzugefügt!")
-
     # List and manage existing expenses
     st.subheader("Bestehende Ausgaben")
     with Session() as session:
         expenses = session.query(Expense).all()
+
+        # Prepare data for st.data_editor
+        data = []
         for expense in expenses:
-            with st.expander(f"{expense.name}"):
-                with st.form(f"edit_expense_{expense.id}"):
-                    edit_name = st.text_input(
-                        "Name", value=expense.name, key=f"edit_name_{expense.id}"
-                    )
-                    edit_amount = st.number_input(
-                        "Jährlicher Betrag",
-                        value=expense.yearly_amount,
-                        key=f"edit_amount_{expense.id}",
-                    )
-                    expense_type_index = list(type_mapping.keys())[
-                        list(type_mapping.values()).index(expense.type)
-                    ]
-                    edit_type = st.selectbox(
-                        "Typ",
-                        ["Festkosten", "pro Kopf"],
-                        index=["Festkosten", "pro Kopf"].index(expense_type_index),
-                        key=f"edit_type_{expense.id}",
-                    )
-                    explanation = st.text_input(
-                        "Erklärung", key=f"edit_explanation_{expense.id}"
-                    )
-                    save_changes_button = st.form_submit_button("Änderungen speichern")
-                    delete_expense_button = st.form_submit_button("Ausgabe löschen")
+            data.append(
+                {
+                    "ID": expense.id,
+                    "Name": expense.name,
+                    "Jährlicher Betrag": expense.yearly_amount,
+                    "Typ": next(
+                        key
+                        for key, value in type_mapping.items()
+                        if value == expense.type
+                    ),
+                    "Erklärung der Änderung": "",  # Placeholder for explanation
+                }
+            )
 
-                    if save_changes_button:
-                        old_amount = expense.yearly_amount
-                        expense.name = edit_name
-                        expense.yearly_amount = edit_amount
-                        expense.type = type_mapping[edit_type]
-                        session.commit()
-                        log_change(
-                            session,
-                            expense.id,
-                            "edit",
-                            explanation,
-                            old_amount,
-                            edit_amount,
-                            "expense",
-                        )
-                        st.success(f"Änderungen für {expense.name} gespeichert!")
+        df = pd.DataFrame(data)
+        with st.form("edit_expenses"):
+            edited_df = st.data_editor(
+                df,
+                num_rows="fixed",
+                key="expense_editor",
+                hide_index=True,
+                column_config={"ID": None},
+            )
 
-                    if delete_expense_button:
-                        explanation = st.text_input(
-                            "Erklärung", key=f"delete_explanation_{expense.id}"
-                        )
-                        log_change(
-                            session,
-                            expense.id,
-                            "delete",
-                            explanation,
-                            expense.yearly_amount,
-                            None,
-                            "expense",
-                        )
-                        session.delete(expense)
-                        session.commit()
-                        st.success(f"Ausgabe {expense.name} gelöscht!")
+            update_button = st.form_submit_button("Änderungen speichern")
+        if update_button:
+            for index, row in edited_df.iterrows():
+                expense = session.query(Expense).filter(Expense.id == row["ID"]).first()
+                if expense:
+                    old_amount = expense.yearly_amount
+                    expense.name = row["Name"]
+                    expense.yearly_amount = row["Jährlicher Betrag"]
+                    expense.type = type_mapping[row["Typ"]]
+                    explanation = row[
+                        "Erklärung"
+                    ]  # Use the explanation from the DataFrame
+                    session.commit()
+                    log_change(
+                        session,
+                        expense.id,
+                        "edit",
+                        explanation,
+                        old_amount,
+                        row["Jährlicher Betrag"],
+                        "expense",
+                    )
+            st.success("Änderungen für Ausgaben gespeichert!")
+
+        delete_button = st.button("Ausgabe löschen")
+
+        if delete_button:
+            selected_expense_id = st.selectbox(
+                "Wählen Sie die zu löschende Ausgabe aus",
+                options=[expense.id for expense in expenses],
+                format_func=lambda id: next(
+                    expense.name for expense in expenses if expense.id == id
+                ),
+                key="delete_expense_id",
+            )
+
+            explanation = st.text_input("Erklärung", key="delete_expense_explanation")
+            confirm_delete_button = st.button("Löschen bestätigen")
+
+            if confirm_delete_button:
+                expense_to_delete = (
+                    session.query(Expense)
+                    .filter(Expense.id == selected_expense_id)
+                    .first()
+                )
+                if expense_to_delete:
+                    log_change(
+                        session,
+                        expense_to_delete.id,
+                        "delete",
+                        explanation,
+                        expense_to_delete.yearly_amount,
+                        None,
+                        "expense",
+                    )
+                    session.delete(expense_to_delete)
+                    session.commit()
+                    st.success(f"Ausgabe {expense_to_delete.name} gelöscht!")
 
 
 def show_funds_management(user: Group):
@@ -1123,76 +1160,105 @@ def show_funds_management(user: Group):
                 )
 
     with st.expander("Fonds bearbeiten oder löschen"):
-
-        delete_fund_name = st.selectbox(
-            "Fonds",
-            [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-            key="delete_fund_name",
-        )
         with Session() as session:
-            delete_fund_obj = (
-                session.query(Fund).filter(Fund.name == delete_fund_name).first()
-            )
-
-            with st.form("Fonds löschen"):
-
-                new_fund_name = st.text_input(
-                    "Fondsname", key="update_fund_name", value=delete_fund_name
-                )
-                new_fund_yearly_target = st.number_input(
-                    "Jährliches Ziel",
-                    min_value=0.0,
-                    key="update_fund_yearly_target",
-                    value=delete_fund_obj.yearly_target,
-                )
-                explanation = st.text_input("Erklärung", key="update_fund_explanation")
-                update_fund_submit = st.form_submit_button("Fonds aktualisieren")
-                transfer_to_fund_name = st.selectbox(
-                    "Übertragen verbleibender Saldo zu",
-                    [fund.name for fund in funds if fund.name != "Einzahlungsfonds"],
-                    key="delete_transfer_to_fund_name",
-                )
-
-                delete_button = st.form_submit_button("Fonds löschen")
-                if update_fund_submit:
-                    old_yearly_target = delete_fund_obj.yearly_target
-                    delete_fund_obj.name = new_fund_name
-                    delete_fund_obj.yearly_target = new_fund_yearly_target
-                    session.commit()
-                    log_change(
-                        session,
-                        delete_fund_obj.id,
-                        "edit",
-                        explanation,
-                        old_yearly_target,
-                        new_fund_yearly_target,
-                        "fund",
+            # Prepare data for st.data_editor
+            data = []
+            for fund in funds:
+                if fund.name != "Einzahlungsfonds":
+                    data.append(
+                        {
+                            "ID": fund.id,
+                            "Name": fund.name,
+                            "Jährliches Ziel": fund.yearly_target,
+                            "Erklärung der Änderung": "",  # Placeholder for explanation
+                            "Aktueller Stand": fund.current_balance,
+                        }
                     )
-                    st.success("Fonds aktualisiert!")
 
-                if delete_button:
-                    explanation = st.text_input(
-                        "Erklärung", key="delete_fund_explanation"
+            df = pd.DataFrame(data)
+            with st.form("edit_funds"):
+                edited_df = st.data_editor(
+                    df,
+                    num_rows="fixed",
+                    key="fund_editor",
+                    disabled=("Aktueller Stand",),
+                    hide_index=True,
+                    column_config={"ID": None},
+                )
+
+                update_button = st.form_submit_button("Änderungen speichern")
+            if update_button:
+                for index, row in edited_df.iterrows():
+                    fund = session.query(Fund).filter(Fund.id == row["ID"]).first()
+                    if fund:
+                        old_yearly_target = fund.yearly_target
+                        fund.name = row["Name"]
+                        fund.yearly_target = row["Jährliches Ziel"]
+                        explanation = row[
+                            "Erklärung"
+                        ]  # Use the explanation from the DataFrame
+                        session.commit()
+                        log_change(
+                            session,
+                            fund.id,
+                            "edit",
+                            explanation,
+                            old_yearly_target,
+                            row["Jährliches Ziel"],
+                            "fund",
+                        )
+                st.success("Fonds aktualisiert!")
+            delete_button = st.button("Fonds löschen")
+
+            if delete_button:
+                selected_fund_id = st.selectbox(
+                    "Wählen Sie den zu löschenden Fonds aus",
+                    options=[
+                        fund.id for fund in funds if fund.name != "Einzahlungsfonds"
+                    ],
+                    format_func=lambda id: next(
+                        fund.name for fund in funds if fund.id == id
+                    ),
+                    key="delete_fund_id",
+                )
+
+                transfer_to_fund_id = st.selectbox(
+                    "Übertragen verbleibender Saldo zu",
+                    options=[
+                        fund.id for fund in funds if fund.name != "Einzahlungsfonds"
+                    ],
+                    format_func=lambda id: next(
+                        fund.name for fund in funds if fund.id == id
+                    ),
+                    key="transfer_to_fund_id",
+                )
+
+                explanation = st.text_input("Erklärung", key="delete_fund_explanation")
+                confirm_delete_button = st.button("Löschen bestätigen")
+
+                if confirm_delete_button:
+                    fund_to_delete = (
+                        session.query(Fund).filter(Fund.id == selected_fund_id).first()
                     )
                     transfer_to_fund = (
                         session.query(Fund)
-                        .filter(Fund.name == transfer_to_fund_name)
+                        .filter(Fund.id == transfer_to_fund_id)
                         .first()
                     )
-                    log_change(
-                        session,
-                        delete_fund_obj.id,
-                        "delete",
-                        explanation,
-                        delete_fund_obj.current_balance,
-                        None,
-                        "fund",
-                    )
-                    delete_fund(delete_fund_obj.id, transfer_to_fund.id, user.id)
-                    st.success(
-                        f"Fonds {delete_fund_name} gelöscht und verbleibender Saldo zu {transfer_to_fund_name} übertragen!"
-                    )
-
+                    if fund_to_delete and transfer_to_fund:
+                        log_change(
+                            session,
+                            fund_to_delete.id,
+                            "delete",
+                            explanation,
+                            fund_to_delete.current_balance,
+                            None,
+                            "fund",
+                        )
+                        delete_fund(fund_to_delete.id, transfer_to_fund.id, user.id)
+                        st.success(
+                            f"Fonds {fund_to_delete.name} gelöscht und verbleibender Saldo zu {transfer_to_fund.name} übertragen!"
+                        )
     with st.expander("Neuen Fonds hinzufügen"):
         with st.form("Neuen Fonds hinzufügen"):
             new_fund_name = st.text_input("Fondsname", key="new_fund_name")
@@ -1390,7 +1456,7 @@ def show_confirmation():
             for transfer_id, transactions in grouped_transactions.items():
                 for transaction in transactions:
                     cols = st.columns([1, 1, 1, 1, 1, 1])
-                    cols[0].write(transaction.topf.name)
+                    cols[0].write(transaction.fund.name)
                     cols[1].write(transaction.group.name)
                     cols[2].write(transaction.comment)
                     cols[3].write(f"{transaction.amount} EUR")
