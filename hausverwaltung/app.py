@@ -1047,7 +1047,7 @@ def show_expenses_management():
                         for key, value in type_mapping.items()
                         if value == expense.type
                     ),
-                    "Erklärung": "",  # Placeholder for explanation
+                    "Erklärung der Änderung": "",  # Placeholder for explanation
                 }
             )
 
@@ -1170,7 +1170,7 @@ def show_funds_management(user: Group):
                             "ID": fund.id,
                             "Name": fund.name,
                             "Jährliches Ziel": fund.yearly_target,
-                            "Erklärung": "",  # Placeholder for explanation
+                            "Erklärung der Änderung": "",  # Placeholder for explanation
                             "Aktueller Stand": fund.current_balance,
                         }
                     )
