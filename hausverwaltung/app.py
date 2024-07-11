@@ -1071,7 +1071,7 @@ def show_expenses_management():
                     expense.yearly_amount = row["Jährlicher Betrag"]
                     expense.type = type_mapping[row["Typ"]]
                     explanation = row[
-                        "Erklärung"
+                        "Erklärung der Änderung"
                     ]  # Use the explanation from the DataFrame
                     session.commit()
                     log_change(
@@ -1195,7 +1195,7 @@ def show_funds_management(user: Group):
                         fund.name = row["Name"]
                         fund.yearly_target = row["Jährliches Ziel"]
                         explanation = row[
-                            "Erklärung"
+                            "Erklärung der Änderung"
                         ]  # Use the explanation from the DataFrame
                         session.commit()
                         log_change(
