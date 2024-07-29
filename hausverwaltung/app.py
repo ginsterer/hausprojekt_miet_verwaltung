@@ -312,9 +312,13 @@ def plot_rent_development():
 
 def show_user_profile(user: Group):
     st.header("Mein Profil")
-    st.subheader("Persönliche Daten")
-
+    st.subheader("Aktuelle Miete")
     with Session() as session:
+        # Retrieve the current rent payment for the group
+        current_cash, current_giro = current_payments(user, session)
+        st.write(f"Bar: {current_cash}, Überweisung: {current_giro}")
+        st.subheader("Persönliche Daten")
+
         group = session.query(Group).filter(Group.name == user.name).first()
         if group:
             new_name = st.text_input("Name", value=group.name)
@@ -1495,14 +1499,6 @@ if authentication_status:
         st.title("Projekte-Miet-Verwaltung")
         authenticator.logout("Abmelden")
 
-    tab_functions = {
-        "Dashboard": show_dashboard,
-        "Einzahlungen": show_deposits,
-        "Ausgabenrückerstatung": show_expenses,
-        "Bargeldverwaltung": show_funds_management,
-        "Mein Profil": show_user_profile,
-    }
-
     admin_tabs = [
         "Dashboard",
         "Bargeldverwaltung",
@@ -1512,10 +1508,10 @@ if authentication_status:
         "Mein Profil",
     ]
     user_tabs = [
+        "Mein Profil",
         "Dashboard",
         "Einzahlungen",
         "Ausgabenrückerstatung",
-        "Mein Profil",
         "Mietgebot abgeben",
     ]
 
